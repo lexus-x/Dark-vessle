@@ -7,7 +7,7 @@ Builds outputs/han_vs_hybrid/ with four standalone figures + one combined dashbo
   04_verdict_dashboard.png   one-glance scoreboard + verdict text
 
 Data: outputs/busan_hybrid_v2.json, outputs/busan_fusion_ablation.json
-Run:  python -m viz.han_vs_hybrid
+Run:  /home/user/anaconda3/bin/python -m viz.han_vs_hybrid
 """
 from __future__ import annotations
 

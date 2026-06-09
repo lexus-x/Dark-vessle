@@ -1,4 +1,3 @@
-# ---- confidential data: never commit ----
 **/data/raw/
 **/dataset - confidential/
 dataset - confidential/
@@ -7,24 +6,17 @@ dataset - confidential/
 *.pth
 *.ckpt
 *.safetensors
-
-# raw tabular data that could carry MMSI / coordinates
 *track_labels*.csv
 **/outputs/*.csv
 ais_*.csv
 radartarget_*.csv
-*.csv
-
-# ---- secrets ----
+**/outputs/
 *.token
 *token*.txt
 .env
 .env.*
-
-# ---- python / os cruft ----
 __pycache__/
 *.py[cod]
 *.egg-info/
 *.log
 .DS_Store
-.ipynb_checkpoints/

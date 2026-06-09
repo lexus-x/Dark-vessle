@@ -181,21 +181,66 @@ def fit_temperature(val_logits, val_y):
     return best_T
 
 
+def run_seed_worker(seed):
+    print(f"[Worker] Starting seed {seed}")
+    model, ctx = train_relative_model(seed=seed)
+    print(f"[Worker] Evaluating curves for seed {seed}")
+    g, l, h = curves_for_model(model, ctx)
+    print(f"[Worker] Evaluating clean split for seed {seed}")
+    y, gsc, lsc, hsc, logits_list = clean_eval(model, ctx)
+    print(f"[Worker] Gathering validation logits for seed {seed}")
+    vL, vy = _val_logits(model, ctx)
+    print(f"[Worker] Finished seed {seed}")
+    return {
+        "seed": seed,
+        "g": g,
+        "l": l,
+        "h": h,
+        "y": y.tolist() if hasattr(y, 'tolist') else list(y),
+        "gsc": gsc.tolist() if hasattr(gsc, 'tolist') else list(gsc),
+        "lsc": lsc.tolist() if hasattr(lsc, 'tolist') else list(lsc),
+        "hsc": hsc.tolist() if hasattr(hsc, 'tolist') else list(hsc),
+        "logits_list": [lg.tolist() if hasattr(lg, 'tolist') else list(lg) for lg in logits_list],
+        "vL": [lg.tolist() if hasattr(lg, 'tolist') else list(lg) for lg in vL],
+        "vy": vy
+    }
+
+
 def main():
+    import multiprocessing
+    try:
+        multiprocessing.set_start_method('spawn', force=True)
+    except RuntimeError:
+        pass
+
+    print(f"Starting parallel evaluation over {K_SEEDS} seeds using {K_SEEDS} processes...")
+    with multiprocessing.Pool(processes=K_SEEDS) as pool:
+        results = pool.map(run_seed_worker, range(K_SEEDS))
+
+    # Sort results by seed just in case
+    results = sorted(results, key=lambda x: x["seed"])
+
     geomc, learnc, hybc = [], [], []
     g_auc, l_auc, h_auc = [], [], []
     pool_val_L, pool_val_y = [], []          # pooled across seeds for calibration
     pool_test_L, pool_test_y = [], []
-    for seed in range(K_SEEDS):
-        model, ctx = train_relative_model(seed=seed)
-        g, l, h = curves_for_model(model, ctx)
+
+    for r in results:
+        seed = r["seed"]
+        g, l, h = r["g"], r["l"], r["h"]
+        y = np.array(r["y"])
+        gsc = np.array(r["gsc"])
+        lsc = np.array(r["lsc"])
+        hsc = np.array(r["hsc"])
+        logits_list = [np.array(lg) for lg in r["logits_list"]]
+        vL = [np.array(lg) for lg in r["vL"]]
+        vy = r["vy"]
+
         geomc.append(g); learnc.append(l); hybc.append(h)
-        y, gsc, lsc, hsc, logits_list = clean_eval(model, ctx)
         if len(set(y.tolist())) == 2:
             g_auc.append(roc_auc_score(y, gsc))
             l_auc.append(roc_auc_score(y, lsc))
             h_auc.append(roc_auc_score(y, hsc))
-        vL, vy = _val_logits(model, ctx)
         pool_val_L += vL; pool_val_y += list(vy)
         pool_test_L += logits_list; pool_test_y += list(y)
         print(f"seed {seed}: clean AUROC geom={g_auc[-1]:.3f} learned={l_auc[-1]:.3f} "
